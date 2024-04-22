@@ -1,5 +1,15 @@
 # Astro Starter Kit: Blog
 
+## Schema Generation POC
+
+Regenerate Zod schema by running:
+
+```
+npm run generate-schema
+```
+
+---
+
 ```sh
 npm create astro@latest -- --template blog
 ```
