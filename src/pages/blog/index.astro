@@ -1,14 +1,24 @@
 ---
+import { z } from 'astro:content';
+
 import BaseHead from '../../components/BaseHead.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
-import { getCollection } from 'astro:content';
 import FormattedDate from '../../components/FormattedDate.astro';
+import { client } from "../../lib/client";
 
-const posts = (await getCollection('blog')).sort(
-	(a, b) => a.data.pubDate.valueOf() - b.data.pubDate.valueOf()
-);
+import { articlesSchema } from "../../lib/schemas/articlesSchema";
+import { mediaImageSchema } from "../../lib/schemas/mediaImageSchema";
+import { fileSchema } from "../../lib/schemas/fileSchema";
+
+type Articles = z.infer<typeof articlesSchema>;
+type MediaImage = z.infer<typeof mediaImageSchema>;
+type File = z.infer<typeof fileSchema>;
+
+const articles = articlesSchema.parse(await client.getCollection<Articles>("node--article", {
+  queryString: "include=field_media_image.field_media_image",
+}));
 ---
 
 <!doctype html>
@@ -90,19 +100,40 @@ const posts = (await getCollection('blog')).sort(
 		<main>
 			<section>
 				<ul>
-					{
-						posts.map((post) => (
-							<li>
-								<a href={`/blog/${post.slug}/`}>
-									<img width={720} height={360} src={post.data.heroImage} alt="" />
-									<h4 class="title">{post.data.title}</h4>
-									<p class="date">
-										<FormattedDate date={post.data.pubDate} />
-									</p>
-								</a>
-							</li>
-						))
-					}
+          {
+            articles.data.map((article) => {
+              const mediaId = article.relationships.field_media_image.data.id;
+              const mediaEntity = articles.included.find(
+                (obj) => obj.id === mediaId
+              );
+              const image: MediaImage = mediaImageSchema.parse(mediaEntity);
+              const fileId =
+                image.relationships.field_media_image.data.id;
+              const fileEntity = articles.included.find(
+                (obj) => obj.id === fileId
+              );
+              const file: File = fileSchema.parse(fileEntity);
+              const fileUrl = file.attributes.uri.url;
+              return (
+                <li>
+                  <a href={article.attributes.path.alias}>
+                    <img
+                      width={720}
+                      height={360}
+                      src={`https://dev-drupal-api-client-poc.pantheonsite.io${fileUrl}`}
+                      alt=""
+                    />
+                    <h4 class="title">{article.attributes.title}</h4>
+                    <p class="date">
+                      <FormattedDate
+                        date={new Date(article.attributes.created)}
+                      />
+                    </p>
+                  </a>
+                </li>
+              );
+            })
+          }
 				</ul>
 			</section>
 		</main>
